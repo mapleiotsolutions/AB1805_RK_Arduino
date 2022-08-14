@@ -224,18 +224,18 @@ bool AB1805::setWDT(int seconds) {
     return bResult;      
 }
 
-bool AB1805::setRtcFromTime(time_t time) {
+bool AB1805::setRtcFromTime(time_t time, uint8_t hundredths) {
     struct tm *tm = gmtime(&time);
-    return setRtcFromTm(tm);
+    return setRtcFromTm(tm, hundredths);
 }
 
-bool AB1805::setRtcFromTm(const struct tm *timeptr) {
+bool AB1805::setRtcFromTm(const struct tm *timeptr, uint8_t hundredths) {
     static const char *errorMsg = "failure in setRtcFromTm %d";
     uint8_t array[8];
 
-    _log.infoln("setRtcAsTm %s", tmToString(timeptr).c_str());
+    _log.infoln("setRtcAsTm %s.%d", tmToString(timeptr).c_str(),hundredths);
 
-    array[0] = 0x00; // hundredths
+    array[0] = valueToBcd(hundredths); // hundredths
     tmToRegisters(timeptr, &array[1], true);
 
     // Can only write RTC registers when WRTC is 1
@@ -259,22 +259,24 @@ bool AB1805::setRtcFromTm(const struct tm *timeptr) {
     return bResult;
 }
 
-bool AB1805::getRtcAsTime(time_t &time) {
+bool AB1805::getRtcAsTime(time_t &time, uint8_t &hundrths) {
     struct tm tmstruct;
+    uint8_t _hundrths;
 
-    bool bResult = getRtcAsTm(&tmstruct);
+    bool bResult = getRtcAsTm(&tmstruct, _hundrths);
     if (bResult) {
         // Technically mktime is local time, not UTC. However, the standard library
         // is set at +0000 so the local time happens to also be UTC. This is the
         // case even if Time.zone() is called, which only affects the Wiring
         // API and does not affect the standard time library.
         time = mktime(&tmstruct);
+        hundrths = _hundrths;
     }
 
     return bResult;   
 }
 
-bool AB1805::getRtcAsTm(struct tm *timeptr) {
+bool AB1805::getRtcAsTm(struct tm *timeptr, uint8_t &hundrths) {
     uint8_t array[8];
     bool bResult = false;
 
@@ -284,8 +286,9 @@ bool AB1805::getRtcAsTm(struct tm *timeptr) {
         bResult = readRegisters(REG_HUNDREDTH, array, sizeof(array));
         if (bResult) {
             registersToTm(&array[1], timeptr, true);
+            hundrths = bcdToValue(array[0]);
 
-            _log.infoln("getRtcAsTm %s", tmToString(timeptr).c_str());
+            _log.infoln("getRtcAsTm %s.%d", tmToString(timeptr).c_str(), hundrths);
         }
     }
     if (!bResult) {
@@ -924,5 +927,3 @@ uint8_t AB1805::valueToBcd(int value) {
 
     return (uint8_t) ((tens << 4) | ones);
 }
-
-

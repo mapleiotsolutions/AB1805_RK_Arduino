@@ -157,13 +157,15 @@ public:
      * 
      * @param time Filled in with the number of second since January 1, 1970 UTC.
      * 
+     * @param time Filled in with the current hundreths of a second
+     * 
      * @return true on success or false if an error occurs.
      * 
      * The time value is basically the same as what would be returned from `Time.now()`
      * except it's retrieved from the AB1805 RTC instead of the system. However both
      * should approximately equal to each other.
      */
-    bool getRtcAsTime(time_t &time);
+    bool getRtcAsTime(time_t &time, uint8_t &hundrths);
 
     /**
      * @brief Get the time from the RTC as a struct tm
@@ -186,7 +188,7 @@ public:
      * - tm_year  years since 1900 (note: 2020 = 120)
      * - tm_wday  days since Sunday	0-6
      */
-    bool getRtcAsTm(struct tm *timeptr);
+    bool getRtcAsTm(struct tm *timeptr, uint8_t &hundrths);
 
     /**
      * @brief Resets the configuration of the AB1805 to default settings
@@ -407,11 +409,11 @@ public:
      * 
      * @param time The time (in seconds since January 1, 1970, UNIX epoch), UTC.
      * 
-     * This is called automatically from AB1805::loop() when the time is updated from the cloud.
-     * You normally don't need to call this yourself. You might call this if you are also getting
-     * time from an external source like a GPS.
+     * @param hundredths The value of the hundredths position. If not specified, the default is 0. 
+     * 
+     * This is called to set the time on the RTC.
      */
-    bool setRtcFromTime(time_t time);
+    bool  setRtcFromTime(time_t time, uint8_t hundredths = 0);
 
     /**
      * @brief Sets the RTC from a time_t
@@ -431,11 +433,12 @@ public:
      * Month of year is 0 - 11, NOT 1 - 12!
      * Year is years since 1900, so 2020 has 120 in the tm_year field!
      * 
-     * This is called automatically from AB1805::loop() when the time is updated from the cloud.
-     * You normally don't need to call this yourself. You might call this if you are also getting
-     * time from an external source like a GPS.
+     *      * 
+     * @param hundredths The value of the hundredths position. If not specified, the default is 0.
+     * 
+     * This is called to set the time on the RTC.
      */
-    bool setRtcFromTm(const struct tm *timeptr);
+    bool setRtcFromTm(const struct tm *timeptr, uint8_t hundredths = 0);
 
     
     /**
