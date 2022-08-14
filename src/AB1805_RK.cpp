@@ -6,19 +6,12 @@
 
 AB1805 *AB1805::instance = 0;
 
-
-// AB1805::AB1805(TwoWire &Wire, uint8_t i2cAddr) : Wire(Wire), i2cAddr(i2cAddr) {
-// AB1805::AB1805() {
-// }
-
 AB1805::AB1805(TwoWire &wire, uint8_t i2cAddr) : wire(wire), i2cAddr(i2cAddr) {
     instance = this;
 }
 
 AB1805::~AB1805() {
-
 }
-
 
 void AB1805::setup(bool callBegin) {
     if (callBegin) {
@@ -117,23 +110,23 @@ bool AB1805::resetConfig(uint32_t flags) {
     _log.traceln("resetConfig(0x%08lx)", flags);
 
     // Reset configuration registers to default values
-    writeRegister(REG_STATUS, REG_STATUS_DEFAULT, false);
-    writeRegister(REG_CTRL_1, REG_CTRL_1_DEFAULT, false);
-    writeRegister(REG_CTRL_2, REG_CTRL_2_DEFAULT, false);
-    writeRegister(REG_INT_MASK, REG_INT_MASK_DEFAULT, false);
-    writeRegister(REG_SQW, REG_SQW_DEFAULT, false);
-    writeRegister(REG_SLEEP_CTRL, REG_SLEEP_CTRL_DEFAULT, false);
+    writeRegister(REG_STATUS, REG_STATUS_DEFAULT);
+    writeRegister(REG_CTRL_1, REG_CTRL_1_DEFAULT);
+    writeRegister(REG_CTRL_2, REG_CTRL_2_DEFAULT);
+    writeRegister(REG_INT_MASK, REG_INT_MASK_DEFAULT);
+    writeRegister(REG_SQW, REG_SQW_DEFAULT);
+    writeRegister(REG_SLEEP_CTRL, REG_SLEEP_CTRL_DEFAULT);
 
     if ((flags & RESET_PRESERVE_REPEATING_TIMER) != 0) {
-        maskRegister(REG_TIMER_CTRL, ~REG_TIMER_CTRL_RPT_MASK, REG_TIMER_CTRL_DEFAULT & ~REG_TIMER_CTRL_RPT_MASK, false);
+        maskRegister(REG_TIMER_CTRL, ~REG_TIMER_CTRL_RPT_MASK, REG_TIMER_CTRL_DEFAULT & ~REG_TIMER_CTRL_RPT_MASK);
     }  
     else {
-        writeRegister(REG_TIMER_CTRL, REG_TIMER_CTRL_DEFAULT, false);
+        writeRegister(REG_TIMER_CTRL, REG_TIMER_CTRL_DEFAULT);
     }
 
-    writeRegister(REG_TIMER, REG_TIMER_DEFAULT, false);
-    writeRegister(REG_TIMER_INITIAL, REG_TIMER_INITIAL_DEFAULT, false);
-    writeRegister(REG_WDT, REG_WDT_DEFAULT, false);
+    writeRegister(REG_TIMER, REG_TIMER_DEFAULT);
+    writeRegister(REG_TIMER_INITIAL, REG_TIMER_INITIAL_DEFAULT);
+    writeRegister(REG_WDT, REG_WDT_DEFAULT);
 
     uint8_t oscCtrl = REG_OSC_CTRL_DEFAULT;
     if ((flags & RESET_DISABLE_XT) != 0) {
@@ -142,12 +135,12 @@ bool AB1805::resetConfig(uint32_t flags) {
         // and ACAL to 0 (however REG_OSC_CTRL_DEFAULT already sets ACAL to 0)
         oscCtrl |= REG_OSC_CTRL_OSEL | REG_OSC_CTRL_FOS;
     }
-    writeRegister(REG_OSC_CTRL, oscCtrl, false);
-    writeRegister(REG_TRICKLE, REG_TRICKLE_DEFAULT, false);
-    writeRegister(REG_BREF_CTRL, REG_BREF_CTRL_DEFAULT, false);
-    writeRegister(REG_AFCTRL, REG_AFCTRL_DEFAULT, false);
-    writeRegister(REG_BATMODE_IO, REG_BATMODE_IO_DEFAULT, false);
-    writeRegister(REG_OCTRL, REG_OCTRL_DEFAULT, false);
+    writeRegister(REG_OSC_CTRL, oscCtrl);
+    writeRegister(REG_TRICKLE, REG_TRICKLE_DEFAULT);
+    writeRegister(REG_BREF_CTRL, REG_BREF_CTRL_DEFAULT);
+    writeRegister(REG_AFCTRL, REG_AFCTRL_DEFAULT);
+    writeRegister(REG_BATMODE_IO, REG_BATMODE_IO_DEFAULT);
+    writeRegister(REG_OCTRL, REG_OCTRL_DEFAULT);
 
     return true;
 }
@@ -231,12 +224,12 @@ bool AB1805::setWDT(int seconds) {
     return bResult;      
 }
 
-bool AB1805::setRtcFromTime(time_t time, bool lock) {
+bool AB1805::setRtcFromTime(time_t time) {
     struct tm *tm = gmtime(&time);
-    return setRtcFromTm(tm, lock);
+    return setRtcFromTm(tm);
 }
 
-bool AB1805::setRtcFromTm(const struct tm *timeptr, bool lock) {
+bool AB1805::setRtcFromTm(const struct tm *timeptr) {
     static const char *errorMsg = "failure in setRtcFromTm %d";
     uint8_t array[8];
 
@@ -248,7 +241,7 @@ bool AB1805::setRtcFromTm(const struct tm *timeptr, bool lock) {
     // Can only write RTC registers when WRTC is 1
     bool bResult = setRegisterBit(REG_CTRL_1, REG_CTRL_1_WRTC);
     if (bResult) {
-        bResult = writeRegisters(REG_HUNDREDTH, array, sizeof(array), false);
+        bResult = writeRegisters(REG_HUNDREDTH, array, sizeof(array));
         if (bResult) {
             // Clear the REG_CTRL_1_WRTC after setting the RTC.
             // Aside from being a good thing to do, that's how we know we've set it.
@@ -666,11 +659,11 @@ bool AB1805::setCountdownTimer(int value, bool minutes) {
 }
 
 
-bool AB1805::readRegister(uint8_t regAddr, uint8_t &value, bool lock) {
-    return readRegisters(regAddr, &value, 1, lock);
+bool AB1805::readRegister(uint8_t regAddr, uint8_t &value) {
+    return readRegisters(regAddr, &value, 1);
 }
 
-bool AB1805::readRegisters(uint8_t regAddr, uint8_t *array, size_t num, bool lock) {
+bool AB1805::readRegisters(uint8_t regAddr, uint8_t *array, size_t num) {
     bool bResult = false;
 
     Wire.beginTransmission(i2cAddr);
@@ -698,20 +691,20 @@ bool AB1805::readRegisters(uint8_t regAddr, uint8_t *array, size_t num, bool loc
 }
 
 
-uint8_t AB1805::readRegister(uint8_t regAddr, bool lock) {
+uint8_t AB1805::readRegister(uint8_t regAddr) {
     uint8_t value = 0;
 
-    (void) readRegister(regAddr, value, lock);
+    (void) readRegister(regAddr, value);
     
     return value;
 }
 
-bool AB1805::writeRegister(uint8_t regAddr, uint8_t value, bool lock) {
-    return writeRegisters(regAddr, &value, 1, lock);
+bool AB1805::writeRegister(uint8_t regAddr, uint8_t value) {
+    return writeRegisters(regAddr, &value, 1);
 }
 
 
-bool AB1805::writeRegisters(uint8_t regAddr, const uint8_t *array, size_t num, bool lock) {
+bool AB1805::writeRegisters(uint8_t regAddr, const uint8_t *array, size_t num) {
     bool bResult = false;
 
     Wire.beginTransmission(i2cAddr);
@@ -730,60 +723,60 @@ bool AB1805::writeRegisters(uint8_t regAddr, const uint8_t *array, size_t num, b
     return bResult;
 }
 
-bool AB1805::maskRegister(uint8_t regAddr, uint8_t andValue, uint8_t orValue, bool lock) {
+bool AB1805::maskRegister(uint8_t regAddr, uint8_t andValue, uint8_t orValue) {
     bool bResult = false;
 
     uint8_t value;
 
-    bResult = readRegister(regAddr, value, false);
+    bResult = readRegister(regAddr, value);
     if (bResult) {
         uint8_t newValue = (value & andValue) | orValue;
         
         if (newValue != value) {
-            bResult = writeRegister(regAddr, newValue, false);
+            bResult = writeRegister(regAddr, newValue);
         }
     }
 
     return bResult;
 }
 
-bool AB1805::isBitClear(uint8_t regAddr, uint8_t bitMask, bool lock) {
+bool AB1805::isBitClear(uint8_t regAddr, uint8_t bitMask) {
     bool bResult;
     uint8_t value;
 
-    bResult = readRegister(regAddr, value, lock);
+    bResult = readRegister(regAddr, value);
     
     return bResult && ((value & bitMask) == 0);
 }
 
-bool AB1805::isBitSet(uint8_t regAddr, uint8_t bitMask, bool lock) {
+bool AB1805::isBitSet(uint8_t regAddr, uint8_t bitMask) {
     bool bResult;
     uint8_t value;
 
-    bResult = readRegister(regAddr, value, lock);
+    bResult = readRegister(regAddr, value);
     
     return bResult && ((value & bitMask) != 0);
 }
 
 
-bool AB1805::clearRegisterBit(uint8_t regAddr, uint8_t bitMask, bool lock) {
-    return maskRegister(regAddr, ~bitMask, 0x00, lock);
+bool AB1805::clearRegisterBit(uint8_t regAddr, uint8_t bitMask) {
+    return maskRegister(regAddr, ~bitMask, 0x00);
 }
 
-bool AB1805::setRegisterBit(uint8_t regAddr, uint8_t bitMask, bool lock) {
-    return maskRegister(regAddr, 0xff, bitMask, lock);
+bool AB1805::setRegisterBit(uint8_t regAddr, uint8_t bitMask) {
+    return maskRegister(regAddr, 0xff, bitMask);
 }
 
 /**
  * @brief Erases the RTC RAM to 0x00
  */
-bool AB1805::eraseRam(bool lock) {
+bool AB1805::eraseRam() {
     bool bResult = true;
     uint8_t array[16];
 
     memset(array, 0, sizeof(array));
     for(size_t ii = 0; ii < 16; ii++) {
-        bResult = writeRam(ii * sizeof(array), array, sizeof(array), false);
+        bResult = writeRam(ii * sizeof(array), array, sizeof(array));
         if (!bResult) {
             _log.errorln("erase failed addr=%u", ii * sizeof(array));
             break;
@@ -805,7 +798,7 @@ bool AB1805::eraseRam(bool lock) {
  *
  * The dataLen can be larger than the maximum I2C read. Multiple reads will be done if necessary.
  */
-bool AB1805::readRam(size_t ramAddr, uint8_t *data, size_t dataLen, bool lock) {
+bool AB1805::readRam(size_t ramAddr, uint8_t *data, size_t dataLen) {
     bool bResult = true;
 
     while(dataLen > 0) {
@@ -825,7 +818,7 @@ bool AB1805::readRam(size_t ramAddr, uint8_t *data, size_t dataLen, bool lock) {
             setRegisterBit(REG_EXT_ADDR, REG_EXT_ADDR_XADA);
         }
 
-        bResult = readRegisters(REG_ALT_RAM + (ramAddr & 0x7f), data, count, false);
+        bResult = readRegisters(REG_ALT_RAM + (ramAddr & 0x7f), data, count);
         if (!bResult) {
             break;
         }
@@ -849,7 +842,7 @@ bool AB1805::readRam(size_t ramAddr, uint8_t *data, size_t dataLen, bool lock) {
  *
  * The dataLen can be larger than the maximum I2C write. Multiple writes will be done if necessary.
  */
-bool AB1805::writeRam(size_t ramAddr, const uint8_t *data, size_t dataLen, bool lock) {
+bool AB1805::writeRam(size_t ramAddr, const uint8_t *data, size_t dataLen) {
     bool bResult = true;
 
 
@@ -870,7 +863,7 @@ bool AB1805::writeRam(size_t ramAddr, const uint8_t *data, size_t dataLen, bool 
             setRegisterBit(REG_EXT_ADDR, REG_EXT_ADDR_XADA);
         }
 
-        bResult = writeRegisters(REG_ALT_RAM + (ramAddr & 0x7f), data, count, false);
+        bResult = writeRegisters(REG_ALT_RAM + (ramAddr & 0x7f), data, count);
         if (!bResult) {
             break;
         }

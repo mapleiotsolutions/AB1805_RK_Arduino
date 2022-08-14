@@ -30,7 +30,7 @@ void setup() {
     
     //Setup an ionterrupt on pin IRQ
     pinMode(IRQ, INPUT_PULLUP);
-    LowPower.attachInterruptWakeup(IRQ, wakeUp, CHANGE);
+    LowPower.attachInterruptWakeup(IRQ, wakeUp, FALLING);
     
     //Setup withFOUT as the interrupt PIN
     ab1805.withFOUT(IRQ).setup();

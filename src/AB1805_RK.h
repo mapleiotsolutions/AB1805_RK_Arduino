@@ -40,7 +40,6 @@ public:
      * You typically allocate one of these objects as a global variable as 
      * a singleton. You can only have one of these objects per device.
      */
-    // AB1805();
     AB1805(TwoWire &wire = Wire, uint8_t i2cAddr = 0x69);
 
     /**
@@ -408,24 +407,16 @@ public:
      * 
      * @param time The time (in seconds since January 1, 1970, UNIX epoch), UTC.
      * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
-     * 
      * This is called automatically from AB1805::loop() when the time is updated from the cloud.
      * You normally don't need to call this yourself. You might call this if you are also getting
      * time from an external source like a GPS.
      */
-    bool setRtcFromTime(time_t time, bool lock = true);
+    bool setRtcFromTime(time_t time);
 
     /**
      * @brief Sets the RTC from a time_t
      * 
      * @param timeptr A struct tm specifying the time. 
-     * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
      * 
      * The following fields are required:
      * - tm_sec	  seconds after the minute	0-61 (usually 0-59)
@@ -444,7 +435,7 @@ public:
      * You normally don't need to call this yourself. You might call this if you are also getting
      * time from an external source like a GPS.
      */
-    bool setRtcFromTm(const struct tm *timeptr, bool lock = true);
+    bool setRtcFromTm(const struct tm *timeptr);
 
     
     /**
@@ -454,24 +445,16 @@ public:
      * 
      * @param value Filled in with the value from the register
      * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
-     * 
      * @return true on success or false on error
      * 
      * There is also an overload that returns value instead of passing it by reference.
      */
-    bool readRegister(uint8_t regAddr, uint8_t &value, bool lock = true);
+    bool readRegister(uint8_t regAddr, uint8_t &value);
 
     /**
      * @brief Reads a AB1805 register (single byte) and returns it
      * 
      * @param regAddr Register address to read from (0x00 - 0xff)
-     * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
      * 
      * @return The value of the register or 0x00 if it could not be read.
      * 
@@ -479,7 +462,7 @@ public:
      * better because you can tell the difference between a value of 0 and a failure
      * (false is returned).
      */
-    uint8_t readRegister(uint8_t regAddr, bool lock = true);
+    uint8_t readRegister(uint8_t regAddr);
 
     /**
      * @brief Reads sequential registers
@@ -490,17 +473,13 @@ public:
      * 
      * @param num Number of registers to read
      * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
-     * 
      * Reads a number of registers at once. This is done when reading the RTC value so
      * it's atomic (counters will not be incremented in the middle of a read). Also used
      * for reading the device RAM.
      * 
      * Do not read past address 0xff. 
      */
-    bool readRegisters(uint8_t regAddr, uint8_t *array, size_t num, bool lock = true);
+    bool readRegisters(uint8_t regAddr, uint8_t *array, size_t num);
 
 
     /**
@@ -510,13 +489,9 @@ public:
      * 
      * @param value This value is written to the register
      * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
-     * 
      * @return true on success or false on error
      */
-    bool writeRegister(uint8_t regAddr, uint8_t value, bool lock = true);
+    bool writeRegister(uint8_t regAddr, uint8_t value);
 
     /**
      * @brief Writes sequential AB1805 registers
@@ -527,15 +502,11 @@ public:
      * 
      * @param num Number of registers to write
      * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
-     * 
      * @return true on success or false on error
      * 
      * Do not write past address 0xff. 
      */
-    bool writeRegisters(uint8_t regAddr, const uint8_t *array, size_t num, bool lock = true);
+    bool writeRegisters(uint8_t regAddr, const uint8_t *array, size_t num);
 
     /**
      * @brief Writes a AB1805 register (single byte) with masking of existing value
@@ -546,19 +517,13 @@ public:
      * 
      * @param orValue This value is logically ORed with this value before storing
      * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
-     * 
      * @return true on success or false on error
      * 
-     * If lock is true then the lock surrounds both the read and write, so the operation is
-     * atomic.
      * 
      * If the value is unchanged after the andValue and orValue is applied, the write is skipped.
      * The read is always done.
      */
-    bool maskRegister(uint8_t regAddr, uint8_t andValue, uint8_t orValue, bool lock = true);
+    bool maskRegister(uint8_t regAddr, uint8_t andValue, uint8_t orValue);
 
     /**
      * @brief Returns true if a bit in a register is 0
@@ -568,13 +533,9 @@ public:
      * @param bitMask Mask to check. Note that the bitMask should have a 1 bit where you are checking
      * for a 0 bit! Normally there is only one bit set in bitMask.
      * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
-     * 
      * @return true if the register could be read and the bit is 0, otherwise false.
      */
-    bool isBitClear(uint8_t regAddr, uint8_t bitMask, bool lock = true);
+    bool isBitClear(uint8_t regAddr, uint8_t bitMask);
 
     /**
      * @brief Returns true if a bit in a register is 1
@@ -584,13 +545,9 @@ public:
      * @param bitMask Mask to check. The bitMask should have a 1 bit where you are checking
      * for a 1 bit. Normally there is only one bit set in bitMask.
      * 
-     * @param lock Lock the I2C bus. Default = true. Pass false if surrounding a block of
-     * related calls with a wire.lock() and wire.unlock() so the block cannot be interrupted
-     * with other I2C operations.
-     * 
      * @return true if the register could be read and the bit is 1, otherwise false.
      */
-    bool isBitSet(uint8_t regAddr, uint8_t bitMask, bool lock = true);
+    bool isBitSet(uint8_t regAddr, uint8_t bitMask);
 
     /**
      * @brief Clear a bit in a register
@@ -600,15 +557,10 @@ public:
      * @param bitMask The bit mask to clear. This has a 1 bit in the bit you want to clear, and will typically
      * only have one bit set, though you can clear multiple bits at the same time with this function.
      * 
-     * @param lock Whether to lock the I2C bus, the default is true. You pass false if you are grouping
-     * together functions in a single lock, for example doing a read/modify/write cycle.
-     * 
      * The bit is cleared only if set. If the bit(s) are already cleared, then only the read is done,
      * and the write is skipped. A read is always done. 
-     * 
-     * If lock is true, then the lock surround both the read and write so the entire operation is atomic.
      */
-    bool clearRegisterBit(uint8_t regAddr, uint8_t bitMask, bool lock = true);
+    bool clearRegisterBit(uint8_t regAddr, uint8_t bitMask);
 
     /**
      * @brief Sets a bit in a register
@@ -618,15 +570,10 @@ public:
      * @param bitMask The bit mask to set. This has a 1 bit in the bit you want to set, and will typically
      * only have one bit set, though you can set multiple bits at the same time with this function.
      * 
-     * @param lock Whether to lock the I2C bus, the default is true. You pass false if you are grouping
-     * together functions in a single lock, for example doing a read/modify/write cycle.
-     * 
      * The bit is set only if cleared (0). If the bit(s) are already set, then only the read is done,
      * and the write is skipped. A read is always done.
-     * 
-     * If lock is true, then the lock surround both the read and write so the entire operation is atomic.
      */
-    bool setRegisterBit(uint8_t regAddr, uint8_t bitMask, bool lock = true);
+    bool setRegisterBit(uint8_t regAddr, uint8_t bitMask);
 
 	/**
 	 * @brief Returns the length of the RTC RAM in bytes (always 256)
@@ -635,11 +582,8 @@ public:
 
 	/**
 	 * @brief Erases the RTC RAM to 0x00 values
-     * 
-     * @param lock Whether to lock the I2C bus, the default is true. You pass false if you are grouping
-     * together functions in a single lock, for example doing a read/modify/write cycle.
 	 */
-	bool eraseRam(bool lock = true);
+	bool eraseRam();
 
 	/**
 	 * @brief Read from RTC RAM using EEPROM-style API
@@ -678,13 +622,10 @@ public:
 	 *
 	 * @param dataLen The number of bytes to read
 	 *
-     * @param lock Whether to lock the I2C bus, the default is true. You pass false if you are grouping
-     * together functions in a single lock, for example doing a read/modify/write cycle.
-     * 
 	 * The dataLen can be larger than the maximum I2C read. Multiple reads will be done if necessary.
      * However do not read past the end of RAM (address 255).
      */
-	virtual bool readRam(size_t ramAddr, uint8_t *data, size_t dataLen, bool lock = true);
+	virtual bool readRam(size_t ramAddr, uint8_t *data, size_t dataLen);
 
     /**
      * @brief Low-level write call
@@ -695,13 +636,10 @@ public:
 	 *
 	 * @param dataLen The number of bytes to write
 	 *
-     * @param lock Whether to lock the I2C bus, the default is true. You pass false if you are grouping
-     * together functions in a single lock, for example doing a read/modify/write cycle.
-     * 
 	 * The dataLen can be larger than the maximum I2C write. Multiple writes will be done if necessary.
      * However do not read past the end of RAM (address 255).
      */
-	virtual bool writeRam(size_t ramAddr, const uint8_t *data, size_t dataLen, bool lock = true);
+	virtual bool writeRam(size_t ramAddr, const uint8_t *data, size_t dataLen);
 
     /**
      * @brief Utility function to convert a struct tm * to a readable string
