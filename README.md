@@ -1,10 +1,9 @@
 # AB1805_RK
 
-*Library for AB1805/AM1805 RTC/Watchdog for Particle devices*
+*Library for AB1805/AM1805 RTC/Watchdog for Arduino devices*
 
-You can [browse the generated API documentation](https://rickkas7.github.io/AB1805_RK/index.html).
-
-The examples and AB1805_RK.h header file should be mostly self-explanatory. There will be a Particle application note that shows the hardware design used with this library shortly.
+This was an original library for Particle Devices forked and updated to use on Arduino devices. 
+The original Particle Version is avalable here: [browse the generated API documentation](https://rickkas7.github.io/AB1805_RK/index.html).
 
 ## Examples
 
@@ -14,6 +13,7 @@ This is just the minimal implement of using the RTC and Watchdog Timer (WDT). He
 
 ```cpp
 #include "AB1805_RK.h"
+#define IRQ 8 
 
 SYSTEM_THREAD(ENABLED);
 SYSTEM_MODE(SEMI_AUTOMATIC);
@@ -22,25 +22,41 @@ SerialLogHandler logHandler;
 
 AB1805 ab1805(Wire);
 
+//Dummy routine needed for interrupt awake. Could be used to set a flag that we woke up via LoRa Packet recieved nterrupt?
+void wakeUp() {
+}
+
 void setup() {
-    // The sample board has D8 connected to FOUT for wake interrupts, though this
-    // example does not use this feature.
-    ab1805.withFOUT(D8).setup();
+    
+    //Setup an ionterrupt on pin IRQ
+    pinMode(IRQ, INPUT_PULLUP);
+    LowPower.attachInterruptWakeup(IRQ, wakeUp, CHANGE);
+    
+    //Setup withFOUT as the interrupt PIN
+    ab1805.withFOUT(IRQ).setup();
 
     // Reset the AB1805 configuration to default values
     ab1805.resetConfig();
 
-    // Enable watchdog
-    ab1805.setWDT(AB1805::WATCHDOG_MAX_SECONDS);
+    //Set the RTC with an initial time. Will update this again with the first message recieved
+    ab1805.setRtcFromTime(1600000000);
 
-    // Connect to the Particle cloud
-    Particle.connect();
+    // Enable watchdog
+    ab1805.setWDT(ab1805.WATCHDOG_MAX_SECONDS);
+
 }
 
-
 void loop() {
-    // Be sure to call ab1805.loop() on every call to loop()
+    // Be sure to call ab1805.loop() on every call to loop() to pet the watchdog
     ab1805.loop();
+
+    delay(1000);
+    ab1805.getRtcAsTime(time_cv);
+    Log.infoln("Time from RTC is: %l", (unsigned long) time_cv);
+
+    // Set an interrupt for 5 seconds in the future. We should wake up 
+    ab1805.interruptCountdownTimer(5, false);
+    LowPower.deepSleep(60000);
 }
 
 ```
@@ -57,6 +73,12 @@ In setup(), call the `ab1805.setup()` method.
 
 ```cpp
     ab1805.setup();
+```
+
+In setup(), when using interrupts you can call this withFOUT indicating the interrupt pin call the `ab1805.withFOUT(IRQ).setup()` method.
+
+```cpp
+    ab1805.withFOUT(IRQ).setup();
 ```
 
 Reset the settings on the AB1805. This isn't strictly necessary since it resets the chip to power-on defaults, but it's not a bad idea to be safe:
@@ -78,46 +100,11 @@ And from loop(), make sure you call the loop method:
 ```
 
 The `ab1805.loop()` method takes care of:
-
 - Serving the watchdog timer.
-- Synchronizing the hardware RTC with the cloud time.
-- Turning off the watchdog before System.reset() in case an OTA firmware update is in progress.
 
+You can call various functions to set different types of interrupts. For example. to set an interrupt 5 seconds in the future call `ab1805.interruptCountdownTimer(5, false)`
 
-### 02-typical
+```cpp
+    ab1805.interruptCountdownTimer(5, false);
+```
 
-The "typical" example adds in a few helpful features:
-
-- An out of memory handler, which will reset the device if a RAM allocation fails.
-- A failure to connect detector, so if it takes longer than 11 minutes to connect to the cloud, a deep power down for 30 seconds is done to hopefully reset things complete.
-
-
-### 03-periodic-wake
-
-This example has the device wake up once per hour and publish a value. It illustrates:
-
-- Using the RTC to wake up the device periodically.
-- Using the 256-byte non-volatile RAM in the RTC.
-- An out of memory handler, which will reset the device if a RAM allocation fails.
-- A failure to connect detector, so if it takes longer than 11 minutes to connect to the cloud, a deep power down for 30 seconds is done to hopefully reset things complete.
- 
-### 04-selftest
-
-The self-test code is used to do a quick check of the hardware to make sure it's visible by I2C. It's helpful when you've soldered up a new board to make sure the AB1805 at least has working I2C communications.
-
-### 05-hwtest
-
-This is the hardware test suite that allows various modes to be tested via commands from the cloud.
-
-### 06-supercap
-
-This is an example of using a board with a super capacitor.
-
-- It enables the supercap trickle charger
-- When the MODE button is tapped, the device goes into 30 second deep power down (with the RTC powered by supercap)
-
-### 07-deep-power
-
-This is the deep power down example that uses a LiPo powered RTC to a deep power down, not using a supercap.
-
-- When the MODE button is tapped, the device goes into 30 second deep power down (with the RTC powered by the LiPo)
