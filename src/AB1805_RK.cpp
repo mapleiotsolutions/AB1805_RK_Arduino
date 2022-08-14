@@ -1,18 +1,18 @@
 #include "AB1805_RK.h"
 
-
-
-//static Logger _log("app.ab1805");
-
 // Define SET_D8_LOW on FeatherAB1805v1 boards as the pull-up is Wired to 3V3R instead
 // of 3V3 which can cause current leakages when powering down using EN.
 #define SET_D8_LOW
 
-// AB1805 *AB1805::instance = 0;
+AB1805 *AB1805::instance = 0;
 
 
 // AB1805::AB1805(TwoWire &Wire, uint8_t i2cAddr) : Wire(Wire), i2cAddr(i2cAddr) {
-AB1805::AB1805() {
+// AB1805::AB1805() {
+// }
+
+AB1805::AB1805(TwoWire &wire, uint8_t i2cAddr) : wire(wire), i2cAddr(i2cAddr) {
+    instance = this;
 }
 
 AB1805::~AB1805() {
@@ -20,49 +20,38 @@ AB1805::~AB1805() {
 }
 
 
-void AB1805::setup() {
-    // if (callBegin) {
+void AB1805::setup(bool callBegin) {
+    if (callBegin) {
         Wire.begin();
-    // }
+    }
 
-    Serial.println("Attempting AB1805 setup");
+    /* Note: if you want to fully remove all logging code, uncomment #define DISABLE_LOGGING in Logging.h this will significantly reduce your project size
+        https://github.com/thijse/Arduino-Log
+        * 0 - LOG_LEVEL_SILENT     no output 
+        * 1 - LOG_LEVEL_FATAL      fatal errors 
+        * 2 - LOG_LEVEL_ERROR      all errors  
+        * 3 - LOG_LEVEL_WARNING    errors, and warnings 
+        * 4 - LOG_LEVEL_NOTICE     errors, warnings and notices 
+        * 5 - LOG_LEVEL_TRACE      errors, warnings, notices & traces 
+        * 6 - LOG_LEVEL_VERBOSE    all 
+    */
+    _log.begin(LOG_LEVEL_VERBOSE, &Serial);
+
     
     if (detectChip()) {
         updateWakeReason();
-        Serial.println("AB1805 Detected");
+        _log.infoln("AB1805 Detected");
 
-        // // If we've set the time in the RTC, then the WRTC bit will be 0.
-        // // On power-up from cold, it's 1
-        // if (isBitClear(REG_CTRL_1, REG_CTRL_1_WRTC) && !Time.isValid()) {
-        //     // Set system clock from RTC
-        //     time_t time;
-
-        //     getRtcAsTime(time);
-        //     Time.setTime(time);
-
-        //     // _log.info("set system clock from RTC %s", Time.format(time, TIME_FORMAT_DEFAULT).c_str());
-        // }
-    }
+        //There is no need to set the time since we do not have a reference to time yet. 
+        }
     else {
-        Serial.println("failed to detect AB1805");
+        _log.errorln("failed to detect AB1805");
     }
-
-    // System.on(reset, systemEventStatic);
 }
 
 void AB1805::loop() {
-    // if (!timeSet && Time.isValid() && Particle.timeSyncedLast() != 0) {
-    //     timeSet = true;
 
-    //     time_t time = Time.now();
-    //     setRtcFromTime(time);
-
-    //     time = 0;
-    //     getRtcAsTime(time);
-    //     // _log.info("set RTC from cloud %s", Time.format(time, TIME_FORMAT_DEFAULT).c_str());
-
-    // }
-
+    //Pet the watchdog during loop when needed. 
     if (watchdogUpdatePeriod) {
         if (millis() - lastWatchdogMillis >= watchdogUpdatePeriod) {
             lastWatchdogMillis = millis();
@@ -85,12 +74,11 @@ bool AB1805::detectChip() {
         while(millis() - start < 1000) {
             if (digitalRead(foutPin) == HIGH) {
                 ready = true;
-                Serial.print("AB1805: FOUT went HIGH");
+                _log.infoln("AB1805: FOUT went HIGH");
                 break;
             }
             if (!ready) {
-                // _log.info("FOUT did not go HIGH");
-                Serial.print("AB1805: FOUT did not go HIGH");
+                _log.infoln("FOUT did not go HIGH");
 
                 // May just want to return false here
             }
@@ -106,7 +94,7 @@ bool AB1805::detectChip() {
         }
     }
     if (!finalResult) {
-        // _log.info("not detected");
+        _log.infoln("not detected");
     }
 
     return finalResult;
@@ -126,9 +114,7 @@ bool AB1805::usingRCOscillator() {
 }
 
 bool AB1805::resetConfig(uint32_t flags) {
-    // _log.trace("resetConfig(0x%08lx)", flags);
-
-    // Wire.lock();
+    _log.traceln("resetConfig(0x%08lx)", flags);
 
     // Reset configuration registers to default values
     writeRegister(REG_STATUS, REG_STATUS_DEFAULT, false);
@@ -163,8 +149,6 @@ bool AB1805::resetConfig(uint32_t flags) {
     writeRegister(REG_BATMODE_IO, REG_BATMODE_IO_DEFAULT, false);
     writeRegister(REG_OCTRL, REG_OCTRL_DEFAULT, false);
 
-    // Wire.unlock();
-
     return true;
 }
 
@@ -175,7 +159,7 @@ bool AB1805::updateWakeReason() {
     uint8_t status;
     bool bResult = readRegister(REG_STATUS, status);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -202,7 +186,7 @@ bool AB1805::updateWakeReason() {
     }
 
     if (reason) {
-        // _log.info("wake reason = %s", reason);
+        _log.infoln("wake reason = %s", reason);
     }
 
     return true;
@@ -210,7 +194,7 @@ bool AB1805::updateWakeReason() {
 
 bool AB1805::setWDT(int seconds) {
     bool bResult = false;
-    // _log.info("setWDT %d", seconds);
+    _log.infoln("setWDT %d", seconds);
 
     if (seconds < 0) {
         seconds = watchdogSecs;
@@ -220,7 +204,7 @@ bool AB1805::setWDT(int seconds) {
         // Disable WDT
         bResult = writeRegister(REG_WDT, 0x00);
 
-        // _log.trace("watchdog cleared bResult=%d", bResult);
+        _log.traceln("watchdog cleared bResult=%d", bResult);
 
         watchdogSecs = 0;
         watchdogUpdatePeriod = 0;
@@ -236,7 +220,7 @@ bool AB1805::setWDT(int seconds) {
         }
         bResult = writeRegister(REG_WDT, REG_WDT_RESET | (fourSecs << 2) | REG_WDT_WRB_1_4_HZ);
 
-        // _log.trace("watchdog set fourSecs=%d bResult=%d", fourSecs, bResult);
+        _log.traceln("watchdog set fourSecs=%d bResult=%d", fourSecs, bResult);
 
         watchdogSecs = seconds;
 
@@ -247,15 +231,6 @@ bool AB1805::setWDT(int seconds) {
     return bResult;      
 }
 
-// bool AB1805::setRtcFromSystem() {
-//     if (Time.isValid()) {
-//         return setRtcFromTime(Time.now());
-//     }
-//     else {
-//         return false;
-//     }
-// }
-
 bool AB1805::setRtcFromTime(time_t time, bool lock) {
     struct tm *tm = gmtime(&time);
     return setRtcFromTm(tm, lock);
@@ -265,11 +240,7 @@ bool AB1805::setRtcFromTm(const struct tm *timeptr, bool lock) {
     static const char *errorMsg = "failure in setRtcFromTm %d";
     uint8_t array[8];
 
-    // _log.info("setRtcAsTm %s", tmToString(timeptr).c_str());
-
-    // if (lock) {
-    //     Wire.lock();
-    // }
+    _log.infoln("setRtcAsTm %s", tmToString(timeptr).c_str());
 
     array[0] = 0x00; // hundredths
     tmToRegisters(timeptr, &array[1], true);
@@ -284,16 +255,13 @@ bool AB1805::setRtcFromTm(const struct tm *timeptr, bool lock) {
             clearRegisterBit(REG_CTRL_1, REG_CTRL_1_WRTC);
         }
         else {
-            // _log.error(errorMsg, __LINE__);
+            _log.errorln(errorMsg, __LINE__);
         }
     }
     else {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
     }
 
-    // if (lock) {
-    //     Wire.unlock();
-    // }
 
     return bResult;
 }
@@ -324,7 +292,7 @@ bool AB1805::getRtcAsTm(struct tm *timeptr) {
         if (bResult) {
             registersToTm(&array[1], timeptr, true);
 
-            // _log.info("getRtcAsTm %s", tmToString(timeptr).c_str());
+            _log.infoln("getRtcAsTm %s", tmToString(timeptr).c_str());
         }
     }
     if (!bResult) {
@@ -337,7 +305,7 @@ bool AB1805::getRtcAsTm(struct tm *timeptr) {
 
 #if 0
 bool AB1805::testEN() {
-    // _log.info("testEN()");
+    // _log.infoln("testEN()");
 
     // Test function to drive EN low (device power off) by setting PSW/nIRQ2 high
     // Note: Only way to recover from this is to depower the AB1805!
@@ -374,14 +342,14 @@ bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue) {
     // Disable watchdog
     bResult = setWDT(0);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Clear any existing alarm (ALM) interrupt in status register
     bResult = clearRegisterBit(REG_STATUS, REG_STATUS_ALM);            
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -393,7 +361,7 @@ bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue) {
 
     bResult = writeRegisters(REG_HUNDREDTH_ALARM, array, sizeof(array));
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -401,16 +369,10 @@ bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue) {
     {
         // TESTING
         uint8_t array2[7];
-
         bResult = readRegisters(REG_HUNDREDTH_ALARM, array2, sizeof(array2));
-        // _log.info("alarm (first) current (second)");
-        // _log.dump(array2, sizeof(array2));
-        // _log.print("\n");
 
         uint8_t array3[8];
         bResult = readRegisters(REG_HUNDREDTH, array3, sizeof(array3));
-        // _log.dump(array3, sizeof(array3));
-        // _log.print("\n");
     }
 #endif
 
@@ -418,21 +380,21 @@ bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue) {
     // "nAIRQ if AIE is set, else OUT"
     bResult = maskRegister(REG_CTRL_2, ~REG_CTRL_2_OUT1S_MASK, REG_CTRL_2_OUT1S_nAIRQ);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Enable alarm interrupt (AIE) in interrupt mask register
     bResult = setRegisterBit(REG_INT_MASK, REG_INT_MASK_AIE);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Enable alarm
     bResult = maskRegister(REG_TIMER_CTRL, ~REG_TIMER_CTRL_RPT_MASK, rptValue & REG_TIMER_CTRL_RPT_MASK);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
     
@@ -446,21 +408,21 @@ bool AB1805::clearRepeatingInterrupt() {
     // Set FOUT/nIRQ control in Control2 to the default value
     bResult = maskRegister(REG_CTRL_2, ~REG_CTRL_2_OUT1S_MASK, REG_CTRL_2_OUT1S_nIRQ);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Disable alarm interrupt (AIE) in interrupt mask register
     bResult = clearRegisterBit(REG_INT_MASK, REG_INT_MASK_AIE);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Disable alarm
     bResult = maskRegister(REG_TIMER_CTRL, ~REG_TIMER_CTRL_RPT_MASK, REG_TIMER_CTRL_RPT_DIS);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -475,7 +437,7 @@ bool AB1805::interruptCountdownTimer(int value, bool minutes) {
     // Disable watchdog
     bResult = setWDT(0);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -483,13 +445,13 @@ bool AB1805::interruptCountdownTimer(int value, bool minutes) {
     // "nIRQ if at least one interrupt is enabled, else OUT"
     bResult = maskRegister(REG_CTRL_2, ~REG_CTRL_2_OUT1S_MASK, REG_CTRL_2_OUT1S_nIRQ);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     bResult = setCountdownTimer(value, minutes);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -500,12 +462,12 @@ bool AB1805::deepPowerDown(int seconds) {
     static const char *errorMsg = "failure in deepPowerDown %d";
     bool bResult;
 
-    // _log.info("deepPowerDown %d", seconds);
+    _log.infoln("deepPowerDown %d", seconds);
 
     // Disable watchdog
     bResult = setWDT(0);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -519,21 +481,21 @@ bool AB1805::deepPowerDown(int seconds) {
     // O1EN to 1 to enable FOUT/nIRQ in sleep mode.
     bResult = setRegisterBit(REG_OCTRL, REG_OCTRL_O1EN);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        // _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Set OUT in Control1 to 0 so the FOUT/nIRQ pin goes low
     bResult = clearRegisterBit(REG_CTRL_1, REG_CTRL_1_OUT);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Make sure SQW is disabled
     bResult = writeRegister(REG_SQW, REG_SQW_DEFAULT);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -541,14 +503,14 @@ bool AB1805::deepPowerDown(int seconds) {
     // Use this mode so FOUT/nIRQ (D8) won't be affected by the countdown timer nIRQ.
     bResult = maskRegister(REG_CTRL_2, ~REG_CTRL_2_OUT1S_MASK, REG_CTRL_2_OUT1S_SQW);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 #endif
 
     bResult = setCountdownTimer(seconds, false);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -557,40 +519,37 @@ bool AB1805::deepPowerDown(int seconds) {
     // (also would probably work with PWR2 = 0, as nIRQ2 should be high-true for sleep mode)
     bResult = maskRegister(REG_CTRL_1, (uint8_t)~(REG_CTRL_1_STOP | REG_CTRL_1_RSP), REG_CTRL_1_PWR2);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Disable the I/O interface in sleep
     bResult = setRegisterBit(REG_OSC_CTRL, REG_OSC_CTRL_PWGT);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // OUT2S = 6 to enable sleep mode
     bResult = maskRegister(REG_CTRL_2, (uint8_t)~REG_CTRL_2_OUT2S_MASK, REG_CTRL_2_OUT2S_SLEEP);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Enter sleep mode and set nRST low
     bResult = writeRegister(REG_SLEEP_CTRL, REG_SLEEP_CTRL_SLP | REG_SLEEP_CTRL_SLRES);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
-    // // _log.trace("delay in case we didn't power down");   
+    // _log.traceln("delay in case we didn't power down");   
     unsigned long start = millis();
     while(millis() - start < (unsigned long) (seconds * 1000)) {
-        // _log.info("REG_SLEEP_CTRL=0x%2x", readRegister(REG_SLEEP_CTRL));
+        _log.infoln("REG_SLEEP_CTRL=0x%2x", readRegister(REG_SLEEP_CTRL));
         delay(1000);
     }
-
-    // _log.error("didn't power down");
-    // System.reset();
 
     return true;
 }
@@ -603,7 +562,7 @@ bool AB1805::setTrickle(uint8_t diodeAndRout) {
     // Automatically resets to 0 so no need to clear it afterwards
     bResult = writeRegister(REG_CONFIG_KEY, REG_CONFIG_KEY_OTHER);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -611,7 +570,7 @@ bool AB1805::setTrickle(uint8_t diodeAndRout) {
 
     bResult = writeRegister(REG_TRICKLE, regValue);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -628,7 +587,7 @@ bool AB1805::checkVBAT(uint8_t mask, bool &isAbove) {
     uint8_t trickleValue;
     bResult = readRegister(REG_TRICKLE, trickleValue);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -662,14 +621,14 @@ bool AB1805::setCountdownTimer(int value, bool minutes) {
     // Clear any pending interrupts
     bResult = writeRegister(REG_STATUS, REG_STATUS_DEFAULT);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Stop countdown timer if already running since it can't be set while running
     bResult = writeRegister(REG_TIMER_CTRL, REG_TIMER_CTRL_DEFAULT);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -682,14 +641,14 @@ bool AB1805::setCountdownTimer(int value, bool minutes) {
     }
     bResult = writeRegister(REG_TIMER, (uint8_t)value);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
     // Enable countdown timer interrupt (TIE = 1) in IntMask
     bResult = setRegisterBit(REG_INT_MASK, REG_INT_MASK_TIE);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -699,7 +658,7 @@ bool AB1805::setCountdownTimer(int value, bool minutes) {
     // Enable countdown timer (TE = 1) in countdown timer control register
     bResult = writeRegister(REG_TIMER_CTRL, REG_TIMER_CTRL_TE | tfs);
     if (!bResult) {
-        // _log.error(errorMsg, __LINE__);
+        _log.errorln(errorMsg, __LINE__);
         return false;
     }
 
@@ -714,10 +673,6 @@ bool AB1805::readRegister(uint8_t regAddr, uint8_t &value, bool lock) {
 bool AB1805::readRegisters(uint8_t regAddr, uint8_t *array, size_t num, bool lock) {
     bool bResult = false;
 
-    // if (lock) {
-    //     Wire.lock();
-    // }
-
     Wire.beginTransmission(i2cAddr);
     Wire.write(regAddr);
     int stat = Wire.endTransmission(false);
@@ -727,24 +682,18 @@ bool AB1805::readRegisters(uint8_t regAddr, uint8_t *array, size_t num, bool loc
             for(size_t ii = 0; ii < num; ii++) {
                 array[ii] = Wire.read();
             }
-            // // _log.trace("readRegisters regAddr=%02x num=%u", regAddr, num);
-            // // _log.dump(array, num);
-            // // _log.print("\n");
 
             bResult = true;
         }
         else {
-            // _log.error("failed to read regAddr=%02x count=%u", regAddr, count);
+            _log.errorln("failed to read regAddr=%02x count=%u", regAddr, count);
             bResult = false;
         }
     }
     else {
-        // _log.error("failed to read regAddr=%02x stat=%d", regAddr, stat);
+        _log.errorln("failed to read regAddr=%02x stat=%d", regAddr, stat);
     }
 
-    // if (lock) {
-    //     Wire.unlock();
-    // }
     return bResult;    
 }
 
@@ -765,10 +714,6 @@ bool AB1805::writeRegister(uint8_t regAddr, uint8_t value, bool lock) {
 bool AB1805::writeRegisters(uint8_t regAddr, const uint8_t *array, size_t num, bool lock) {
     bool bResult = false;
 
-    // if (lock) {
-    //     Wire.lock();
-    // }
-
     Wire.beginTransmission(i2cAddr);
     Wire.write(regAddr);
     for(size_t ii = 0; ii < num; ii++) {
@@ -776,27 +721,17 @@ bool AB1805::writeRegisters(uint8_t regAddr, const uint8_t *array, size_t num, b
     }
     int stat = Wire.endTransmission(true);
     if (stat == 0) {
-        // // _log.trace("writeRegisters regAddr=%02x num=%u", regAddr, num);
-        // // _log.dump(array, num);
-        // // _log.print("\n");
         bResult = true;
     }
     else {
-        // _log.error("failed to write regAddr=%02x stat=%d", regAddr, stat);
+        _log.errorln("failed to write regAddr=%02x stat=%d", regAddr, stat);
     }
 
-    // if (lock) {
-    //     Wire.unlock();
-    // }
     return bResult;
 }
 
 bool AB1805::maskRegister(uint8_t regAddr, uint8_t andValue, uint8_t orValue, bool lock) {
     bool bResult = false;
-
-    // if (lock) {
-    //     Wire.lock();
-    // }
 
     uint8_t value;
 
@@ -809,9 +744,6 @@ bool AB1805::maskRegister(uint8_t regAddr, uint8_t andValue, uint8_t orValue, bo
         }
     }
 
-    // if (lock) {
-    //     Wire.unlock();
-    // }
     return bResult;
 }
 
@@ -849,22 +781,15 @@ bool AB1805::eraseRam(bool lock) {
     bool bResult = true;
     uint8_t array[16];
 
-    // if (lock) {
-    //     Wire.lock();
-    // }
-
     memset(array, 0, sizeof(array));
     for(size_t ii = 0; ii < 16; ii++) {
         bResult = writeRam(ii * sizeof(array), array, sizeof(array), false);
         if (!bResult) {
-            // _log.error("erase failed addr=%u", ii * sizeof(array));
+            _log.errorln("erase failed addr=%u", ii * sizeof(array));
             break;
         }
     }
 
-    // if (lock) {
-    //     Wire.unlock();
-    // }
 
     return bResult;
 }
@@ -882,10 +807,6 @@ bool AB1805::eraseRam(bool lock) {
  */
 bool AB1805::readRam(size_t ramAddr, uint8_t *data, size_t dataLen, bool lock) {
     bool bResult = true;
-
-    // if (lock) {
-    //     Wire.lock();
-    // }
 
     while(dataLen > 0) {
         size_t count = dataLen;
@@ -913,9 +834,6 @@ bool AB1805::readRam(size_t ramAddr, uint8_t *data, size_t dataLen, bool lock) {
         data += count;
     }
 
-    // if (lock) {
-    //     Wire.unlock();
-    // }
 
     return bResult;
 }
@@ -933,10 +851,6 @@ bool AB1805::readRam(size_t ramAddr, uint8_t *data, size_t dataLen, bool lock) {
  */
 bool AB1805::writeRam(size_t ramAddr, const uint8_t *data, size_t dataLen, bool lock) {
     bool bResult = true;
-
-    // if (lock) {
-    //     Wire.lock();
-    // }
 
 
     while(dataLen > 0) {
@@ -964,19 +878,17 @@ bool AB1805::writeRam(size_t ramAddr, const uint8_t *data, size_t dataLen, bool 
         dataLen -= count;
         data += count;
     }
-    // if (lock) {
-    //     Wire.unlock();
-    // }
 
     return bResult;
 }
 
-// // [static]
-// String AB1805::tmToString(const struct tm *timeptr) {
-//     return String::format("%04d-%02d-%02d %02d:%02d:%02d", 
-//         timeptr->tm_year + 1900, timeptr->tm_mon + 1, timeptr->tm_mday,
-//         timeptr->tm_hour, timeptr->tm_min, timeptr->tm_sec);
-// }
+// [static]
+String AB1805::tmToString(const struct tm *timeptr) {
+
+    char buf1[20];
+    sprintf(buf1, "%04d-%02d-%02d %02d:%02d:%02d",   timeptr->tm_year + 1900, timeptr->tm_mon + 1, timeptr->tm_mday, timeptr->tm_hour, timeptr->tm_min, timeptr->tm_sec);
+    return String(buf1);
+}
 
 // [static] 
 void AB1805::tmToRegisters(const struct tm *timeptr, uint8_t *array, bool includeYear) {
@@ -1019,21 +931,5 @@ uint8_t AB1805::valueToBcd(int value) {
 
     return (uint8_t) ((tens << 4) | ones);
 }
-
-
-// void AB1805::systemEvent(system_event_t event, int param) {
-//     if (event == reset) {
-//         if (watchdogSecs != 0) {
-//             setWDT(0);
-//         }
-//     }
-// }
-
-// // [static] 
-// void AB1805::systemEventStatic(system_event_t event, int param) {
-//     if (instance) {
-//         instance->systemEvent(event, param);
-//     }
-// }
 
 

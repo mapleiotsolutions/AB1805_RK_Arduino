@@ -1,11 +1,12 @@
 #ifndef __AB1805RK_H
 #define __AB1805RK_H
 
-// #include "Particle.h"
-
 #include <time.h> // struct tm
 #include <Wire.h>
 #include <Arduino.h>
+#include <ArduinoLog.h>
+
+static Logging _log;
 
 /**
  * @brief Class for using the AB1805/AM1805 RTC/watchdog chip
@@ -39,7 +40,8 @@ public:
      * You typically allocate one of these objects as a global variable as 
      * a singleton. You can only have one of these objects per device.
      */
-    AB1805();
+    // AB1805();
+    AB1805(TwoWire &wire = Wire, uint8_t i2cAddr = 0x69);
 
     /**
      * @brief Destructor. Not normally used as this object is typically a global object.
@@ -51,8 +53,7 @@ public:
      * 
      * @param callBegin Whether to call wire.begin(). Default is true.
      */
-    // void setup(bool callBegin = true);
-    void setup();
+    void setup(bool callBegin = true);
 
     /**
      * @brief Call this from main loop(). Should be called on every call to loop().
@@ -401,13 +402,6 @@ public:
      */
     bool checkVBAT(uint8_t mask, bool &isAbove);
 
-    // /**
-    //  * @brief Set the RTC from the system clock
-    //  * 
-    //  * This is called automatically from AB1805::loop() when the time is updated from the cloud.
-    //  * You normally don't need to call this yourself.
-    //  */
-    // bool setRtcFromSystem();
 
     /**
      * @brief Sets the RTC from a time_t
@@ -709,12 +703,12 @@ public:
      */
 	virtual bool writeRam(size_t ramAddr, const uint8_t *data, size_t dataLen, bool lock = true);
 
-    // /**
-    //  * @brief Utility function to convert a struct tm * to a readable string
-    //  * 
-    //  * @return String in the format of "yyyy-mm-dd hh:mm:ss". 
-    //  */
-    // static String tmToString(const struct tm *timeptr);
+    /**
+     * @brief Utility function to convert a struct tm * to a readable string
+     * 
+     * @return String in the format of "yyyy-mm-dd hh:mm:ss". 
+     */
+    static String tmToString(const struct tm *timeptr);
 
     /**
      * @brief Convert a struct tm to register values for the AB1805
@@ -948,25 +942,10 @@ public:
     #define PIN_INVALID -1
 
 protected:
-    // /**
-    //  * @brief Internal function used to handle system events
-    //  * 
-    //  * We currently only handle the reset event to disable the WDT before reset so it
-    //  * won't trigger during a OTA firmware update.
-    //  */
-    // void systemEvent(system_event_t event, int param);
-
-    // /**
-    //  * @brief Static function passed to System.on
-    //  * 
-    //  * AB1805 is a singleton so AB1805::instance is used to find the instance pointer.
-    //  */
-    // static void systemEventStatic(system_event_t event, int param);
-
-    // /**
-    //  * @brief Which I2C (TwoWire) interface to use. Usually Wire, is Wire1 on Tracker SoM
-    //  */
-    // TwoWire &wire = Wire; 
+    /**
+     * @brief Which I2C (TwoWire) interface to use. Usually Wire, is Wire1 on Tracker SoM
+     */
+    TwoWire &wire = Wire; 
 
     /**
      * @brief I2C address, always 0x69 as that is the address hardwired in the AB1805
