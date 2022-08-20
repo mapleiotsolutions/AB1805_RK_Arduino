@@ -209,6 +209,8 @@ public:
      * 
      * @param time The number of second after January 1, 1970 UTC. 
      * 
+     * @param hundreths Optional - the Hundreths value of the RTC to interrupt at
+     * 
      * @return true on success or false if an error occurs.
      * 
      * This causes an interrupt on FOUT/nIRQ in the future. It will execute
