@@ -322,16 +322,16 @@ bool AB1805::testEN() {
 }  
 #endif
 
-bool AB1805::interruptAtTime(time_t time) {
+bool AB1805::interruptAtTime(time_t time, uint8_t hundredths) {
     struct tm *tm = gmtime(&time);
-    return interruptAtTm(tm);
+    return interruptAtTm(tm, hundredths);
 }
 
-bool AB1805::interruptAtTm(struct tm *timeptr) {
-    return repeatingInterrupt(timeptr, REG_TIMER_CTRL_RPT_DATE);
+bool AB1805::interruptAtTm(struct tm *timeptr, uint8_t hundredths) {
+    return repeatingInterrupt(timeptr, REG_TIMER_CTRL_RPT_DATE, hundredths);
 }
 
-bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue) {
+bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue, uint8_t hundredths) {
     static const char *errorMsg = "failure in repeatingInterrupt %d";
     bool bResult;
 
@@ -352,7 +352,7 @@ bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue) {
     // Set alarm registers
     uint8_t array[7];
 
-    array[0] = 0x00; // hundredths
+    array[0] = valueToBcd(hundredths); // hundredths
     tmToRegisters(timeptr, &array[1], false);
 
     bResult = writeRegisters(REG_HUNDREDTH_ALARM, array, sizeof(array));

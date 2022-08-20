@@ -157,7 +157,7 @@ public:
      * 
      * @param time Filled in with the number of second since January 1, 1970 UTC.
      * 
-     * @param time Filled in with the current hundreths of a second
+     * @param hundreths Filled in with the current hundreths of a second
      * 
      * @return true on success or false if an error occurs.
      * 
@@ -172,6 +172,8 @@ public:
      * 
      * @param timeptr pointer to struct tm. Filled in with the current time, UTC.
      * 
+     * @param hundreths Filled in with the current hundreths of a second
+     *
      * @return true on success or false if an error occurs.
      * 
      * Note: This uses mktime, which technically is local time, not UTC. However,
@@ -216,12 +218,14 @@ public:
      * There can only be one interrupt set. Setting at one-time or repeating interrupt
      * removes any previously set interrupt time.
      */
-    bool interruptAtTime(time_t time);
+    bool interruptAtTime(time_t time, uint8_t hundredths = 0);
 
     /**
      * @brief Set an interrupt at a time in the future using a struct tm *.
      * 
      * @param timeptr pointer to struct tm. This specifies the time (UTC).
+     * 
+     * @param hundreths Optional - the Hundreths value of the RTC to interrupt at
      * 
      * @return true on success or false if an error occurs.
      * 
@@ -244,7 +248,7 @@ public:
      * - tm_year  years since 1900 (note: 2020 = 120)
      * - tm_wday  days since Sunday	0-6
      */
-    bool interruptAtTm(struct tm *timeptr);
+    bool interruptAtTm(struct tm *timeptr, uint8_t hundredths = 0);
 
     /**
      * @brief Set a repeating interrupt
@@ -252,6 +256,8 @@ public:
      * @param timeptr pointer to struct tm. This specifies the time (UTC).
      * 
      * @param rptValue a constant for which fields of timeptr are used.
+     * 
+     * @param hundreths Optional - the Hundreths value of the RTC to interrupt at
      * 
      * @return true on success or false if an error occurs.
      * 
@@ -284,7 +290,7 @@ public:
      * - tm_year  years since 1900 (note: 2020 = 120)
      * - tm_wday  days since Sunday	0-6
      */
-    bool repeatingInterrupt(struct tm *timeptr, uint8_t rptValue);
+    bool repeatingInterrupt(struct tm *timeptr, uint8_t rptValue, uint8_t hundredths = 0);
 
     /**
      * @brief Clear repeating interrupt set with `repeatingInterrupt()`.
@@ -418,7 +424,9 @@ public:
     /**
      * @brief Sets the RTC from a time_t
      * 
-     * @param timeptr A struct tm specifying the time. 
+     * @param timeptr A struct tm specifying the time.
+     * 
+     * @param hundreths The value of the hundredths position. If not specified, the default is 0. 
      * 
      * The following fields are required:
      * - tm_sec	  seconds after the minute	0-61 (usually 0-59)
