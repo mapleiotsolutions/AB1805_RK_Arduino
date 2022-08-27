@@ -106,6 +106,123 @@ bool AB1805::usingRCOscillator() {
     }
 }
 
+bool AB1805::IRQClockOut(uint8_t SQW_SEL) {
+    bool bResult;
+    static const char *errorMsg = "failure in IRQClockOut %d";
+    
+    // First let's log the current register values
+    // _log.infoln("REG_SQW=0x%x", readRegister(REG_SQW));
+    // _log.infoln("REG_CTRL_1=0x%x", readRegister(REG_CTRL_1));
+    // _log.infoln("REG_CTRL_2=0x%x", readRegister(REG_CTRL_2));
+    
+    //Requires setting Ctrl_1_Out = 1 to enable the Square Wave output. 
+    bResult = maskRegister(REG_CTRL_2, ~REG_CTRL_1_OUT, 0xff);
+
+    // Set FOUT/nIRQ control in Control2 to SQW
+    bResult = maskRegister(REG_CTRL_2, ~REG_CTRL_2_OUT1S_MASK, REG_CTRL_2_OUT1S_SQW);
+    if (!bResult) {
+        _log.error(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Set REQ_SQW to the desired frequency and enable SQWE 
+    bResult = writeRegister(REG_SQW, SQW_SEL);
+    if (!bResult) {
+        _log.error(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Let's print the registers after to confirm we wrote them correctly
+    // _log.infoln("REG_SQW=0x%x", readRegister(REG_SQW));
+    // _log.infoln("REG_CTRL_1=0x%x", readRegister(REG_CTRL_1));
+    // _log.infoln("REG_CTRL_2=0x%x", readRegister(REG_CTRL_2));
+
+    return true;
+}
+
+bool AB1805::setPPMAdj(int16_t PPM_Adj) {
+    bool bResult;
+    int16_t Adj = 0; 
+    uint8_t XTCAL = 0;
+    uint8_t CMDX = 0;
+    int8_t OFFSETX = 0;
+    uint8_t CAL_XT_Value; 
+    static const char *errorMsg = "failure in IRQClockOut %d";
+
+    //Per the XT Calibration Procedure section 5.9.1 of the AB1805 Application Manual:
+    Adj = PPM_Adj/(1.90735);
+
+    if ( Adj < -320 ){
+        Log.errorln("The XT frequency is too high to be calibrated");
+        return false;;
+    }
+    else if (Adj < -256){ 
+        XTCAL = 3; 
+        CMDX = 1; 
+        OFFSETX = (Adj +192)/2;
+        }
+    else if (Adj < -192){
+        XTCAL = 3;
+        CMDX = 0; 
+        OFFSETX = Adj +192;
+        }
+    else if (Adj < -128){
+        XTCAL = 2;
+        CMDX = 0;
+        OFFSETX = Adj +128;
+        }
+    else if (Adj < -64){
+        XTCAL = 1;
+        CMDX = 0;
+        OFFSETX = Adj + 64;
+        }
+    else if (Adj < 64){
+        XTCAL = 0;
+        CMDX = 0;
+        OFFSETX = Adj;
+        }
+    else if (Adj < 128){
+        XTCAL = 0;
+        CMDX = 1;
+        OFFSETX = Adj/2;
+        }
+    else {
+        Log.errorln("The XT frequency is too low to be calibrated");
+        return false;;
+    }
+
+    //Determine the value of the entire register. The offset register is 7 bit 2's complement. 
+    if (OFFSETX < 0) {
+        CAL_XT_Value = ((~abs(OFFSETX))+1 & 0x7F) | CMDX << 7;
+    }
+    else{
+        CAL_XT_Value = (OFFSETX & 0x7F) | CMDX << 7;
+    }
+
+    // _log.infoln("Before: CAL_XT_Value=0x%x", CAL_XT_Value);
+    // _log.infoln("Before: REG_CAL_XT=0x%x", readRegister(REG_CAL_XT));
+    // _log.infoln("Before: REG_OSC_STATUS=0x%x", readRegister(REG_OSC_STATUS));
+
+    // Adjust the XT Calibration Registers based on the value sent
+     bResult = writeRegister(REG_CAL_XT, CAL_XT_Value);
+     if (!bResult) {
+        _log.error(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Set the first two bits of the OSC status register to XTCAL
+    bResult = writeRegister(REG_OSC_STATUS, XTCAL << 6);
+     if (!bResult) {
+        _log.error(errorMsg, __LINE__);
+        return false;
+    }
+
+    // _log.infoln("After: REG_CAL_XT=0x%x", readRegister(REG_CAL_XT));
+    // _log.infoln("After: REG_OSC_STATUS=0x%x", readRegister(REG_OSC_STATUS));
+
+    return true;
+}
+
 bool AB1805::resetConfig(uint32_t flags) {
     _log.traceln("resetConfig(0x%08lx)", flags);
 
