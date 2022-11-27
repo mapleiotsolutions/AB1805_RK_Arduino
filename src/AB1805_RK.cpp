@@ -28,7 +28,7 @@ void AB1805::setup(bool callBegin) {
         * 5 - LOG_LEVEL_TRACE      errors, warnings, notices & traces 
         * 6 - LOG_LEVEL_VERBOSE    all 
     */
-    _log.begin(LOG_LEVEL_VERBOSE, &Serial);
+    _log.begin(LOG_LEVEL_INFO, &Serial);
 
     
     if (detectChip()) {
@@ -40,6 +40,9 @@ void AB1805::setup(bool callBegin) {
     else {
         _log.errorln("failed to detect AB1805");
     }
+
+    //Set the INT MASK to defaults so we can use the 1/8192 duration interrupt to be more precise. Do this once during setup. 
+    writeRegister(REG_INT_MASK, REG_INT_MASK_IM64);
 }
 
 void AB1805::loop() {
@@ -377,19 +380,72 @@ bool AB1805::setRtcFromTm(const struct tm *timeptr, uint8_t hundredths) {
 }
 
 bool AB1805::getRtcAsTime(time_t &time, uint8_t &hundrths) {
-    struct tm tmstruct;
-    uint8_t _hundrths;
+    struct tm tmstruct1;
+    struct tm tmstruct2;
+    struct tm tmstruct3;
+    uint8_t _hundrths1;
+    uint8_t _hundrths2;
+    uint8_t _hundrths3;
 
-    bool bResult = getRtcAsTm(&tmstruct, _hundrths);
-    if (bResult) {
-        // Technically mktime is local time, not UTC. However, the standard library
-        // is set at +0000 so the local time happens to also be UTC. This is the
-        // case even if Time.zone() is called, which only affects the Wiring
-        // API and does not affect the standard time library.
-        time = mktime(&tmstruct);
-        hundrths = _hundrths;
+    // Hundredths Synchronization per: https://abracon.com/Support/AppsManuals/Precisiontiming/AB18XX-Application-Manual.pdf section 5.6:
+    /*
+    If the Hundredths Counter is read as part of the burst read from the counter registers, the following algorithm must be used to guarantee correct read information.
+    1. Read the Counters, using a burst read. If the Hundredths Counter is neither 00 nor 99, the read is correct.
+    2. If the Hundredths Counter was 00, perform the read again. The resulting value from this second read is guaranteed to be correct.
+    3. If the Hundredths Counter was 99, perform the read again.
+    A. If the Hundredths Counter is still 99, the results of the first read are guaranteed to be correct.
+    Note that it is possible that the second read is not correct.
+    B. If the Hundredths Counter has rolled over to 00, and the Seconds Counter value from the second read is equal to the Seconds Counter value from the first read plus 1, both reads produced
+     correct values. Alternatively, perform the read again. The resulting value from this third read is guaranteed to be correct.
+    C. If the Hundredths Counter has rolled over to 00, and the Seconds Counter value from the second read is equal to the Seconds Counter value from the first read, perform the read again. The
+    resulting value from this third read is guaranteed to be correct.
+    */
+
+    // First perform a burst read:
+    bool bResult = getRtcAsTm(&tmstruct1, _hundrths1);
+
+    //2. If the Hundredths Counter was 00, perform the read again. The resulting value from this second read is guaranteed to be correct.
+    if (_hundrths1 == 0){
+        bResult = getRtcAsTm(&tmstruct2, _hundrths2);
+        time = mktime(&tmstruct2);
+        hundrths = _hundrths2;
+        // _log.infoln("_hundrths2 %u", _hundrths2);
+        return bResult;
     }
 
+    //3. If the Hundredths Counter was 99, perform the read again.
+    //     A. If the Hundredths Counter is still 99, the results of the first read are guaranteed to be correct.
+    //     Note that it is possible that the second read is not correct.
+    //     B. If the Hundredths Counter has rolled over to 00, and the Seconds Counter value from the second read is equal to the Seconds Counter value from the first read plus 1, both reads produced
+    //     correct values. Alternatively, perform the read again. The resulting value from this third read is
+    //     guaranteed to be correct.
+    //     C. If the Hundredths Counter has rolled over to 00, and the Seconds Counter value from the second read is equal to the Seconds Counter value from the first read, perform the read again. The
+    //     resulting value from this third read is guaranteed to be correct.
+    else if(_hundrths1 == 99){
+        bResult = getRtcAsTm(&tmstruct2, _hundrths2);
+        if(_hundrths2 == 99){
+            time = mktime(&tmstruct1);
+            hundrths = _hundrths1;
+            //  _log.infoln("_hundrths1 %u", _hundrths1);
+            return bResult;
+        }
+        else{
+            bResult = getRtcAsTm(&tmstruct3, _hundrths3);
+            time = mktime(&tmstruct3);
+            hundrths = _hundrths3;
+            //  _log.infoln("_hundrths3 %u", _hundrths3);
+            return bResult;
+        }
+    } 
+
+    // 1. Read the Counters, using a burst read. If the Hundredths Counter is neither 00 nor 99, the read is correct.
+    else{
+        time = mktime(&tmstruct1);
+        hundrths = _hundrths1;
+        // _log.infoln("_hundrths1__ %u", _hundrths1);
+        return bResult;
+    }
+    
     return bResult;   
 }
 
@@ -445,7 +501,7 @@ bool AB1805::interruptAtTime(time_t time, uint8_t hundredths) {
 }
 
 bool AB1805::interruptAtTm(struct tm *timeptr, uint8_t hundredths) {
-    return repeatingInterrupt(timeptr, REG_TIMER_CTRL_RPT_DATE, hundredths);
+    return repeatingInterrupt(timeptr, REG_TIMER_CTRL_RPT_MIN, hundredths);
 }
 
 bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue, uint8_t hundredths) {
@@ -453,11 +509,11 @@ bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue, uint8_t hu
     bool bResult;
 
     // Disable watchdog
-    bResult = setWDT(0);
-    if (!bResult) {
-        _log.errorln(errorMsg, __LINE__);
-        return false;
-    }
+    // bResult = setWDT(0);
+    // if (!bResult) {
+    //     _log.errorln(errorMsg, __LINE__);
+    //     return false;
+    // }
 
     // Clear any existing alarm (ALM) interrupt in status register
     bResult = clearRegisterBit(REG_STATUS, REG_STATUS_ALM);            
@@ -469,8 +525,10 @@ bool AB1805::repeatingInterrupt(struct tm *timeptr, uint8_t rptValue, uint8_t hu
     // Set alarm registers
     uint8_t array[7];
 
-    array[0] = valueToBcd(hundredths); // hundredths
     tmToRegisters(timeptr, &array[1], false);
+    
+    array[0] = valueToBcd(hundredths); // hundredths
+    _log.infoln("hundredths reg set to: %u", bcdToValue(array[0]));
 
     bResult = writeRegisters(REG_HUNDREDTH_ALARM, array, sizeof(array));
     if (!bResult) {
@@ -622,6 +680,13 @@ bool AB1805::deepPowerDown(int seconds) {
 #endif
 
     bResult = setCountdownTimer(seconds, false);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Enable external interrupt to wake if someone cycles the on/off switch
+    bResult = setRegisterBit(REG_INT_MASK, REG_INT_MASK_EX1E);
     if (!bResult) {
         _log.errorln(errorMsg, __LINE__);
         return false;

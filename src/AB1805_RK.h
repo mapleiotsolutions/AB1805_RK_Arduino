@@ -784,6 +784,8 @@ public:
     static const uint8_t   REG_INT_MASK_EX2E        = 0x02;      //!< Interrupt mask, XT2 interrupt enable
     static const uint8_t   REG_INT_MASK_EX1E        = 0x01;      //!< Interrupt mask, XT1 interrupt enable
     static const uint8_t   REG_INT_MASK_DEFAULT     = 0xe0;      //!< Interrupt mask, default 0b11100000 (CEB | IM=1/4 seconds)
+    static const uint8_t   REG_INT_MASK_IM8192      = 0xA0;      //!< Interrupt mask, default 0b10100000 (CEB | IM=1/8192 seconds)
+    static const uint8_t   REG_INT_MASK_IM64        = 0xC0;      //!< Interrupt mask, default 0b11000000 (CEB | IM=1/64 seconds)
     static const uint8_t REG_SQW                    = 0x13;      //!< Square wave output control
     static const uint8_t   REG_SQW_SQWE             = 0x80;      //!< Square wave output control, enable
     static const uint8_t   REG_SQW_DEFAULT          = 0x26;      //!< Square wave output control, default 0b00100110
