@@ -28,7 +28,7 @@ void AB1805::setup(bool callBegin) {
         * 5 - LOG_LEVEL_TRACE      errors, warnings, notices & traces 
         * 6 - LOG_LEVEL_VERBOSE    all 
     */
-    _log.begin(LOG_LEVEL_INFO, &Serial);
+    _log.begin(LOG_LEVEL_SILENT, &Serial);
 
     
     if (detectChip()) {
