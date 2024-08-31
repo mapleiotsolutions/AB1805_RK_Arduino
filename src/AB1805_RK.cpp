@@ -732,6 +732,110 @@ bool AB1805::deepPowerDown(int seconds) {
     return true;
 }
 
+bool AB1805::deepPowerDownTime(time_t time, uint8_t hundredths) {
+    static const char *errorMsg = "failure in deepPowerDown %d";
+    bool bResult;
+
+    // _log.infoln("deepPowerDown");
+
+    // Disable watchdog
+    bResult = setWDT(0);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+#ifdef SET_D8_LOW
+    // With FeatherAB1905v1 board, setting D8 low prior to sleep is necessary
+    // to prevent current leakage. In V1, D8 is pulled up to 3V3R. In V2 and
+    // later, it's pulled up to 3V3, so it won't be pulled in sleep and this
+    // code is not necessary.
+
+    // Set Output Control Register 1 (0x30)
+    // O1EN to 1 to enable FOUT/nIRQ in sleep mode.
+    bResult = setRegisterBit(REG_OCTRL, REG_OCTRL_O1EN);
+    if (!bResult) {
+        // _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Set OUT in Control1 to 0 so the FOUT/nIRQ pin goes low
+    bResult = clearRegisterBit(REG_CTRL_1, REG_CTRL_1_OUT);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Make sure SQW is disabled
+    bResult = writeRegister(REG_SQW, REG_SQW_DEFAULT);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Set OUT1S in Control2 to 01 so FOUT/nIRQ is set from SQW or OUT. Since SQW is off, this means OUT only.
+    // Use this mode so FOUT/nIRQ (D8) won't be affected by the countdown timer nIRQ.
+    bResult = maskRegister(REG_CTRL_2, ~REG_CTRL_2_OUT1S_MASK, REG_CTRL_2_OUT1S_SQW);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+#endif
+
+    // Clear any pending interrupts
+    bResult = writeRegister(REG_STATUS, REG_STATUS_DEFAULT);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // bResult = setCountdownTimer(seconds, false);
+    bResult = interruptAtTime(time, hundredths);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Enable external interrupt to wake if someone cycles the on/off switch
+    bResult = setRegisterBit(REG_INT_MASK, REG_INT_MASK_EX1E);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Make sure STOP (stop clocking system is 0, otherwise sleep mode cannot be entered)
+    // PWR2 = 1 (low resistance power switch)
+    // (also would probably work with PWR2 = 0, as nIRQ2 should be high-true for sleep mode)
+    bResult = maskRegister(REG_CTRL_1, (uint8_t)~(REG_CTRL_1_STOP | REG_CTRL_1_RSP), REG_CTRL_1_PWR2);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Disable the I/O interface in sleep
+    bResult = setRegisterBit(REG_OSC_CTRL, REG_OSC_CTRL_PWGT);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // OUT2S = 6 to enable sleep mode
+    bResult = maskRegister(REG_CTRL_2, (uint8_t)~REG_CTRL_2_OUT2S_MASK, REG_CTRL_2_OUT2S_SLEEP);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    // Enter sleep mode and set nRST low
+    bResult = writeRegister(REG_SLEEP_CTRL, REG_SLEEP_CTRL_SLP | REG_SLEEP_CTRL_SLRES);
+    if (!bResult) {
+        _log.errorln(errorMsg, __LINE__);
+        return false;
+    }
+
+    return true;
+}
+
 bool AB1805::setTrickle(uint8_t diodeAndRout) {
     static const char *errorMsg = "failure in setTrickle %d";
     bool bResult;

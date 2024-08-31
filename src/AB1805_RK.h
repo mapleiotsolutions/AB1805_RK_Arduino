@@ -355,6 +355,29 @@ public:
      */
     bool deepPowerDown(int seconds = 30);
 
+     /**
+     * @brief Enters deep power down reset mode, using the EN pin
+     * 
+     * @param time The number of second after January 1, 1970 UTC. 
+     * 
+     * @param hundreths Optional - the Hundreths value of the RTC to interrupt at
+     * 
+     * @return true on success or false if an error occurs.
+     * 
+     * This method powers down the MCU and cellular modem by using a combination
+     * of the EN and RST pins. This super-reset is similar to what would happen if
+     * you disconnected the battery.
+     * 
+     * It assumes that EN is connected to /nIRQ2 (PSW) on the AB1805 using an 
+     * N-channel MOSFET and RST is connected to /RESET on the AB1805.
+     * 
+     * After the deep reset finishes, the device will reboot and go back through
+     * setup() again. Calling getWakeReset() will return the reason `DEEP_POWER_DOWN`.
+     * 
+     * This works even if the RTC has not been set yet.
+     */
+    bool deepPowerDownTime(time_t time, uint8_t hundredths = 0);
+
     /**
      * @brief Used internally by interruptCountdownTimer and deepPowerDown.
      * 
